@@ -11,8 +11,8 @@ import type { VisionMetrics, WorkState } from "@/lib/types";
 function metrics(over: Partial<VisionMetrics> = {}): VisionMetrics {
   return {
     facePresent: true,
-    gazeYawDeg: 0,
-    gazePitchDeg: 0,
+    gazeYawNorm: 0,
+    gazePitchNorm: 0,
     neckAngleDeg: 10,
     phonePresent: false,
     eyeOpenness: 0.9,
@@ -32,16 +32,16 @@ describe("rawState", () => {
 
   it("prioritizes phone over everything else when present", () => {
     expect(
-      rawState(metrics({ phonePresent: true, gazeYawDeg: 90 })),
+      rawState(metrics({ phonePresent: true, gazeYawNorm: 0.9 })),
     ).toBe("phone");
   });
 
-  it("returns distracted when looking far off-screen", () => {
-    expect(rawState(metrics({ gazeYawDeg: 40 }))).toBe("distracted");
+  it("returns distracted when looking far off-screen (left/right)", () => {
+    expect(rawState(metrics({ gazeYawNorm: 0.5 }))).toBe("distracted");
   });
 
-  it("returns fading when the head drops", () => {
-    expect(rawState(metrics({ gazePitchDeg: -30 }))).toBe("fading");
+  it("does not flag focus on pitch alone (pitch is not yet thresholded)", () => {
+    expect(rawState(metrics({ gazePitchNorm: 0.9 }))).toBe("focused");
   });
 
   it("returns fading when eyes are mostly closed", () => {
@@ -58,13 +58,13 @@ describe("rawState", () => {
 describe("step hysteresis", () => {
   it("does not switch on a single off sample", () => {
     let s = initialClassifierState("focused");
-    const r = step(s, metrics({ gazeYawDeg: 40 }));
+    const r = step(s, metrics({ gazeYawNorm: 0.5 }));
     expect(r.committed).toBe("focused");
   });
 
   it("switches only after 3 consecutive agreeing samples", () => {
     let s = initialClassifierState("focused");
-    const away = metrics({ gazeYawDeg: 40 });
+    const away = metrics({ gazeYawNorm: 0.5 });
     const seq: WorkState[] = [];
     for (let i = 0; i < 3; i++) {
       const r = step(s, away);
@@ -76,14 +76,14 @@ describe("step hysteresis", () => {
 
   it("resets the candidate run when an interrupting sample arrives", () => {
     let s = initialClassifierState("focused");
-    s = step(s, metrics({ gazeYawDeg: 40 })).state; // distracted candidate (1)
-    s = step(s, metrics({ gazeYawDeg: 40 })).state; // distracted candidate (2)
+    s = step(s, metrics({ gazeYawNorm: 0.5 })).state; // distracted candidate (1)
+    s = step(s, metrics({ gazeYawNorm: 0.5 })).state; // distracted candidate (2)
     // A focused sample interrupts and clears the pending switch.
     const back = step(s, metrics());
     expect(back.committed).toBe("focused");
     s = back.state;
     // One more distracted sample should NOT immediately commit (run restarted).
-    expect(step(s, metrics({ gazeYawDeg: 40 })).committed).toBe("focused");
+    expect(step(s, metrics({ gazeYawNorm: 0.5 })).committed).toBe("focused");
   });
 });
 
@@ -91,7 +91,7 @@ describe("classifySequence", () => {
   it("ignores a brief glance away (flicker rejection)", () => {
     const samples = [
       metrics(),
-      metrics({ gazeYawDeg: 40 }), // single glance
+      metrics({ gazeYawNorm: 0.5 }), // single glance
       metrics(),
       metrics(),
     ];

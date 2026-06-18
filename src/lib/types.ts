@@ -15,11 +15,10 @@ export type WorkState = (typeof WORK_STATES)[number];
 export interface VisionMetrics {
   // Is a face detected in frame at all?
   facePresent: boolean;
-  // Horizontal head/eye deviation from screen-center, in degrees.
-  // ~0 = looking at screen, large magnitude = looking away.
-  gazeYawDeg: number;
-  // Vertical head deviation, degrees. Large negative = head dropped (fading).
-  gazePitchDeg: number;
+  // Horizontal gaze, normalized ~[-1,1]. ~0 = facing screen, large = looking away.
+  gazeYawNorm: number;
+  // Vertical gaze, normalized. ~0 = level, positive = looking DOWN (e.g. phone).
+  gazePitchNorm: number;
   // Forward neck flexion angle, degrees. Higher = more slouch.
   neckAngleDeg: number;
   // A phone-like object detected near the hands/face.

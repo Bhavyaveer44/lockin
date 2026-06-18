@@ -135,8 +135,8 @@ export default function SessionPage() {
                 {JSON.stringify(
                   {
                     face: metrics.facePresent,
-                    yaw: metrics.gazeYawDeg.toFixed(1),
-                    pitch: metrics.gazePitchDeg.toFixed(1),
+                    yaw: metrics.gazeYawNorm.toFixed(2),
+                    pitch: metrics.gazePitchNorm.toFixed(2),
                     neck: metrics.neckAngleDeg.toFixed(1),
                     eye: metrics.eyeOpenness.toFixed(2),
                     phone: metrics.phonePresent,

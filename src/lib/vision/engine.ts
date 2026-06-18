@@ -8,7 +8,7 @@ import {
   type ObjectDetectorResult,
 } from "@mediapipe/tasks-vision";
 import type { VisionMetrics } from "@/lib/types";
-import { headPoseFromMatrix, neckAngle } from "./geometry";
+import { yawNorm, pitchNorm, neckAngle } from "./geometry";
 
 // Hosted model + wasm assets. Loaded at runtime so nothing is bundled and the
 // app stays light. All inference happens in this browser tab.
@@ -37,7 +37,6 @@ export class VisionEngine {
         runningMode: "VIDEO",
         numFaces: 1,
         outputFaceBlendshapes: true,
-        outputFacialTransformationMatrixes: true,
       }),
       PoseLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: MODELS.pose, delegate: "GPU" },
@@ -47,7 +46,7 @@ export class VisionEngine {
       ObjectDetector.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: MODELS.object, delegate: "GPU" },
         runningMode: "VIDEO",
-        scoreThreshold: 0.4,
+        scoreThreshold: 0.25,
         categoryAllowlist: ["cell phone"],
       }),
     ]);
@@ -64,9 +63,11 @@ export class VisionEngine {
     const poseRes = this.pose!.detectForVideo(video, ts);
     const objRes = this.object!.detectForVideo(video, ts);
 
+    const lm = faceRes.faceLandmarks?.[0];
     return {
-      facePresent: hasFace(faceRes),
-      ...gazeFrom(faceRes),
+      facePresent: !!lm,
+      gazeYawNorm: lm ? yawNorm(lm) : 0,
+      gazePitchNorm: lm ? pitchNorm(lm) : 0,
       eyeOpenness: eyeOpennessFrom(faceRes),
       neckAngleDeg: neckFrom(poseRes),
       phonePresent: phoneFrom(objRes),
@@ -80,20 +81,6 @@ export class VisionEngine {
     this.object?.close();
     this.face = this.pose = this.object = null;
   }
-}
-
-function hasFace(r: FaceLandmarkerResult): boolean {
-  return (r.faceLandmarks?.length ?? 0) > 0;
-}
-
-function gazeFrom(r: FaceLandmarkerResult): {
-  gazeYawDeg: number;
-  gazePitchDeg: number;
-} {
-  const mtx = r.facialTransformationMatrixes?.[0]?.data;
-  if (!mtx) return { gazeYawDeg: 0, gazePitchDeg: 0 };
-  const { yawDeg, pitchDeg } = headPoseFromMatrix(Array.from(mtx));
-  return { gazeYawDeg: yawDeg, gazePitchDeg: pitchDeg };
 }
 
 function eyeOpennessFrom(r: FaceLandmarkerResult): number {

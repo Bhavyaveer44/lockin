@@ -1,22 +1,23 @@
 import type { VisionMetrics, WorkState } from "@/lib/types";
 
-// Thresholds tuned for a typical laptop webcam at desk distance.
+// Thresholds tuned for a typical laptop webcam at desk distance. Gaze values
+// are normalized (~[-1,1]), not degrees, so they're independent of head size.
 export const THRESHOLDS = {
-  gazeAwayDeg: 25, // |yaw| beyond this = looking away from screen
-  headDropPitchDeg: -20, // pitch below this = head dropped / nodding off
+  gazeAwayNorm: 0.35, // |yaw| beyond this = looking left/right off-screen
   slouchNeckDeg: 45, // neck flexion beyond this = slouching
-  drowsyEyeOpenness: 0.45, // sustained below this = fading
+  drowsyEyeOpenness: 0.4, // sustained below this = eyes closing / fading
 };
 
 // Raw, per-tick verdict from a single metrics sample (no smoothing).
+// pitch is intentionally NOT thresholded yet — its level baseline is face-
+// dependent and needs field calibration; we surface it in the debug panel.
 export function rawState(m: VisionMetrics): WorkState {
   if (!m.facePresent) return "away";
   if (m.phonePresent) return "phone";
-  // Drowsy/fading: head dropped or eyes mostly closed.
-  if (m.gazePitchDeg < THRESHOLDS.headDropPitchDeg) return "fading";
+  // Eyes mostly closed = fading/drowsy.
   if (m.eyeOpenness < THRESHOLDS.drowsyEyeOpenness) return "fading";
-  // Looking away from the screen (but still present, no phone).
-  if (Math.abs(m.gazeYawDeg) > THRESHOLDS.gazeAwayDeg) return "distracted";
+  // Looking away: head turned left/right off the screen.
+  if (Math.abs(m.gazeYawNorm) > THRESHOLDS.gazeAwayNorm) return "distracted";
   return "focused";
 }
 

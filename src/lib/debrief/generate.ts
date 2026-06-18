@@ -7,7 +7,9 @@ import type { DayAggregate } from "./aggregate";
 function groqModel() {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY is not set");
-  return createGroq({ apiKey })("llama-3.3-70b-versatile");
+  // gpt-oss-20b supports `json_schema` structured output on Groq;
+  // llama-3.3-70b-versatile does NOT and rejects generateObject.
+  return createGroq({ apiKey })("openai/gpt-oss-20b");
 }
 
 export const debriefSchema = z.object({

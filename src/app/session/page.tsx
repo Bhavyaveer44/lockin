@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useVisionSignals } from "@/lib/vision/useVisionSignals";
 import { SignalRecorder } from "@/lib/recorder";
+import { Beeper } from "@/lib/sound";
 import { Hud } from "@/components/Hud";
 import type { WorkState } from "@/lib/types";
 
@@ -13,18 +14,32 @@ const NUDGES: Partial<Record<WorkState, string>> = {
   distracted: "👀 Drifting off-screen — refocus.",
 };
 
+// States that should trigger the audible alarm when first entered.
+const ALARM_STATES: ReadonlySet<WorkState> = new Set([
+  "distracted",
+  "phone",
+  "fading",
+]);
+
 export default function SessionPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const recorderRef = useRef<SignalRecorder | null>(null);
+  const beeperRef = useRef<Beeper | null>(null);
   const stateRef = useRef<WorkState>("focused");
+  const soundRef = useRef(true);
   const [active, setActive] = useState(false);
   const [focusedSec, setFocusedSec] = useState(0);
   const [nudge, setNudge] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
 
   const { status, error, state, metrics, start, stop } = useVisionSignals(
     videoRef,
     (committed, ts) => {
       recorderRef.current?.mark(committed, ts);
+      // Alarm the moment focus breaks (fires on the committed transition).
+      if (soundRef.current && ALARM_STATES.has(committed)) {
+        beeperRef.current?.alarm();
+      }
     },
   );
 
@@ -33,6 +48,10 @@ export default function SessionPage() {
     stateRef.current = state;
     setNudge(NUDGES[state] ?? null);
   }, [state]);
+
+  useEffect(() => {
+    soundRef.current = soundOn;
+  }, [soundOn]);
 
   // 1s ticker: accumulate deep-work time + periodic flush.
   useEffect(() => {
@@ -50,6 +69,8 @@ export default function SessionPage() {
     if (!res.ok) return;
     const { sessionId } = (await res.json()) as { sessionId: string };
     recorderRef.current = new SignalRecorder(sessionId);
+    // Created here so the AudioContext is unlocked by this click gesture.
+    beeperRef.current = new Beeper();
     setFocusedSec(0);
     setActive(true);
     start();
@@ -58,6 +79,8 @@ export default function SessionPage() {
   async function handleStop() {
     stop();
     setActive(false);
+    beeperRef.current?.close();
+    beeperRef.current = null;
     const rec = recorderRef.current;
     if (rec) {
       rec.closeCurrent(Date.now());
@@ -114,12 +137,21 @@ export default function SessionPage() {
               Start session
             </button>
           ) : (
-            <button
-              onClick={handleStop}
-              className="rounded-full border border-neutral-700 px-6 py-3 font-medium hover:bg-neutral-900"
-            >
-              End session
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleStop}
+                className="rounded-full border border-neutral-700 px-6 py-3 font-medium hover:bg-neutral-900"
+              >
+                End session
+              </button>
+              <button
+                onClick={() => setSoundOn((s) => !s)}
+                title={soundOn ? "Mute alarm" : "Unmute alarm"}
+                className="rounded-full border border-neutral-700 px-4 py-3 hover:bg-neutral-900"
+              >
+                {soundOn ? "🔔" : "🔕"}
+              </button>
+            </div>
           )}
 
           {!active && focusedSec > 0 && (

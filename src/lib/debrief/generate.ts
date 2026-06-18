@@ -27,22 +27,41 @@ export type Debrief = z.infer<typeof debriefSchema> & {
   topDistraction: string | null;
 };
 
+// Render seconds as a short, human phrase ("3 min 20 sec", "45 sec").
+function human(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  if (m === 0) return `${s} sec`;
+  if (s === 0) return `${m} min`;
+  return `${m} min ${s} sec`;
+}
+
 export async function generateDebrief(agg: DayAggregate): Promise<Debrief> {
+  const totalSec = agg.totalSec;
+  const byStateHuman = Object.fromEntries(
+    Object.entries(agg.byState)
+      .filter(([, s]) => s > 0)
+      .map(([k, s]) => [k, human(s)]),
+  );
+
   const { object } = await generateObject({
     model: groqModel(),
-    schema: debriefSchema,
-    prompt: `You are a focus coach reviewing a knowledge worker's day. You only
-have derived, on-device signals (no video). Be specific, warm, and honest — not
+    prompt: `You are a focus coach reviewing a work session. You only have
+derived, on-device signals (no video). Be specific, warm, and honest — not
 generic. Avoid platitudes.
 
+Total tracked time TODAY: ${human(totalSec)} (this is the ENTIRE period — do NOT
+describe it as hours or imply it was longer than this).
 Focus score: ${agg.focusScore}/100 (share of engaged time spent locked in).
 Top distraction: ${agg.topDistraction ?? "none"}.
-Time by state (seconds): ${JSON.stringify(agg.byState)}.
-Hourly timeline:
+Time by state: ${JSON.stringify(byStateHuman)}.
+Timeline by hour-of-day:
 ${agg.timeline || "(no activity tracked)"}
 
-Write a debrief that references the actual timeline (e.g. a specific hour where
-focus dipped) and gives one concrete fix tied to their biggest leak.`,
+Use ONLY the durations given above — never invent or round up to hours. If the
+total is a few minutes, talk in minutes. Reference a specific moment where focus
+dipped and give one concrete fix tied to their biggest leak.`,
+    schema: debriefSchema,
   });
 
   return {

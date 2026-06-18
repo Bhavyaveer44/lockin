@@ -1,65 +1,67 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Show, SignInButton } from "@clerk/nextjs";
+
+const STATES = [
+  { label: "focused", color: "bg-emerald-500", note: "eyes on screen, alert" },
+  { label: "distracted", color: "bg-amber-500", note: "looking away" },
+  { label: "phone", color: "bg-rose-500", note: "phone in hand" },
+  { label: "away", color: "bg-neutral-500", note: "left the desk" },
+  { label: "fading", color: "bg-violet-500", note: "head dropping, drowsy" },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex-1">
+      <section className="mx-auto max-w-3xl px-6 pt-20 pb-16 text-center">
+        <p className="mb-4 inline-block rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-300">
+          100% on-device · frames never leave your browser
+        </p>
+        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
+          Your webcam is now a{" "}
+          <span className="text-emerald-400">focus coach.</span>
+        </h1>
+        <p className="mx-auto mt-6 max-w-xl text-lg text-neutral-400">
+          Lockin watches your desk in real time — gaze, posture, phone, presence
+          — and infers when you&apos;re locked in vs. drifting. At day&apos;s end an
+          AI writes you a debrief. The video is processed entirely in this tab;
+          only tiny state labels are ever saved.
+        </p>
+        <div className="mt-9 flex items-center justify-center gap-4">
+          <Show when="signed-in">
+            <Link
+              href="/session"
+              className="rounded-full bg-emerald-500 px-6 py-3 font-medium text-neutral-950 hover:bg-emerald-400"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Start a focus session
+            </Link>
+          </Show>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="rounded-full bg-emerald-500 px-6 py-3 font-medium text-neutral-950 hover:bg-emerald-400">
+                Get started
+              </button>
+            </SignInButton>
+          </Show>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-3xl px-6 pb-24">
+        <h2 className="mb-6 text-center text-sm font-mono uppercase tracking-widest text-neutral-500">
+          What it reads, on your device
+        </h2>
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {STATES.map((s) => (
+            <li
+              key={s.label}
+              className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+              <span className={`h-3 w-3 rounded-full ${s.color}`} />
+              <span className="font-mono text-sm">{s.label}</span>
+              <span className="ml-auto text-xs text-neutral-500">{s.note}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lockin — on-device deep-work camera companion
 
-## Getting Started
+Your webcam becomes a focus coach. Real-time computer vision runs **entirely in
+the browser** (MediaPipe Tasks Vision) — the camera feed never touches a server.
+Only derived state labels + timestamps are saved. At day's end, Groq turns that
+timeline into an AI focus debrief.
 
-First, run the development server:
+## How it works
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Webcam → MediaPipe (in-browser)
+  • FaceLandmarker → gaze yaw/pitch + eye openness
+  • PoseLandmarker → neck/slouch angle, presence
+  • ObjectDetector → phone-in-hand
+→ state classifier (hysteresis): focused | distracted | phone | away | fading
+→ live HUD + nudges
+→ batched {state, startedAt, durationSec} → Neon   (frames discarded)
+→ /today: Groq reads the day's timeline → headline, narrative, one fix
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Next 16 (App Router) · Clerk v7 · Neon + Drizzle · Groq (AI SDK v6) ·
+MediaPipe Tasks Vision · Tailwind v4 · Vercel.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup
 
-## Learn More
+1. `npm install`
+2. Copy `.env.example` → `.env.local` and fill in Clerk, Neon, Groq keys.
+3. `npm run db:push` to create the `sessions` / `signal_events` tables.
+4. `npm run dev` and open http://localhost:3000
 
-To learn more about Next.js, take a look at the following resources:
+## Privacy invariant
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+No image or video bytes are ever sent anywhere. The `/api/signals` endpoint
+accepts only the `WorkState` enum + timestamps (validated with zod). Verify in
+DevTools → Network: you'll see small JSON label batches, never image payloads.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Tests
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm test` — covers the state classifier (hysteresis/flicker), head-pose
+geometry, and day aggregation. 20 tests.

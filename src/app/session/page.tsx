@@ -7,6 +7,12 @@ import { SignalRecorder } from "@/lib/recorder";
 import { Beeper } from "@/lib/sound";
 import { Hud } from "@/components/Hud";
 import { Calibration } from "@/components/Calibration";
+import { PrivacyBadge } from "@/components/PrivacyBadge";
+import {
+  startPrivacyMonitor,
+  stopPrivacyMonitor,
+  resetPrivacyStat,
+} from "@/lib/privacy/monitor";
 import {
   loadProfile,
   clearProfile,
@@ -35,6 +41,7 @@ export default function SessionPage() {
   const soundRef = useRef(true);
   const [active, setActive] = useState(false);
   const [focusedSec, setFocusedSec] = useState(0);
+  const [frames, setFrames] = useState(0);
   const [nudge, setNudge] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(true);
   const [profile, setProfile] = useState<CalibrationProfile | null>(null);
@@ -72,6 +79,12 @@ export default function SessionPage() {
     else if (ALARM_STATES.has(stateRef.current)) beeperRef.current?.start();
   }, [soundOn]);
 
+  // Count every frame analyzed on-device (one per vision sample) for the
+  // privacy meter. metrics only changes while a session is running.
+  useEffect(() => {
+    if (metrics) setFrames((f) => f + 1);
+  }, [metrics]);
+
   // 1s ticker: accumulate deep-work time + periodic flush.
   useEffect(() => {
     if (!active) return;
@@ -90,7 +103,11 @@ export default function SessionPage() {
     recorderRef.current = new SignalRecorder(sessionId);
     // Created here so the AudioContext is unlocked by this click gesture.
     beeperRef.current = new Beeper();
+    // Begin measuring outbound traffic for the live privacy meter.
+    resetPrivacyStat();
+    startPrivacyMonitor();
     setFocusedSec(0);
+    setFrames(0);
     setActive(true);
     start();
   }
@@ -98,6 +115,7 @@ export default function SessionPage() {
   async function handleStop() {
     stop();
     setActive(false);
+    stopPrivacyMonitor();
     beeperRef.current?.close();
     beeperRef.current = null;
     const rec = recorderRef.current;
@@ -211,6 +229,8 @@ export default function SessionPage() {
               See today&apos;s debrief →
             </Link>
           )}
+
+          {active && <PrivacyBadge framesAnalyzed={frames} />}
 
           {metrics && active && (
             <details className="w-full text-xs text-neutral-600">

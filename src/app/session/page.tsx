@@ -6,6 +6,12 @@ import { useVisionSignals } from "@/lib/vision/useVisionSignals";
 import { SignalRecorder } from "@/lib/recorder";
 import { Beeper } from "@/lib/sound";
 import { Hud } from "@/components/Hud";
+import { Calibration } from "@/components/Calibration";
+import {
+  loadProfile,
+  clearProfile,
+  type CalibrationProfile,
+} from "@/lib/state/calibration";
 import type { WorkState } from "@/lib/types";
 
 const NUDGES: Partial<Record<WorkState, string>> = {
@@ -31,6 +37,13 @@ export default function SessionPage() {
   const [focusedSec, setFocusedSec] = useState(0);
   const [nudge, setNudge] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(true);
+  const [profile, setProfile] = useState<CalibrationProfile | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
+
+  // Restore any on-device calibration from a previous visit.
+  useEffect(() => {
+    setProfile(loadProfile());
+  }, []);
 
   const { status, error, state, metrics, start, stop } = useVisionSignals(
     videoRef,
@@ -43,6 +56,7 @@ export default function SessionPage() {
         beeperRef.current?.stop();
       }
     },
+    profile,
   );
 
   // Mirror committed state into refs + drive nudges.
@@ -101,6 +115,15 @@ export default function SessionPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center px-6 py-10">
+      {calibrating && (
+        <Calibration
+          onDone={(p) => {
+            setProfile(p);
+            setCalibrating(false);
+          }}
+          onCancel={() => setCalibrating(false)}
+        />
+      )}
       <div className="grid w-full gap-8 md:grid-cols-2 md:items-center">
         <div className="relative aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
           {/* Mirror the preview; this stream stays in the browser. */}
@@ -135,12 +158,36 @@ export default function SessionPage() {
           {error && <p className="text-sm text-rose-400">{error}</p>}
 
           {!active ? (
-            <button
-              onClick={handleStart}
-              className="rounded-full bg-emerald-500 px-6 py-3 font-medium text-neutral-950 hover:bg-emerald-400"
-            >
-              Start session
-            </button>
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={handleStart}
+                className="rounded-full bg-emerald-500 px-6 py-3 font-medium text-neutral-950 hover:bg-emerald-400"
+              >
+                Start session
+              </button>
+              <div className="flex items-center gap-2 text-xs">
+                <span className={profile ? "text-emerald-400" : "text-neutral-500"}>
+                  {profile ? "✓ Calibrated to you" : "Not calibrated"}
+                </span>
+                <button
+                  onClick={() => setCalibrating(true)}
+                  className="text-neutral-400 underline hover:text-neutral-200"
+                >
+                  {profile ? "recalibrate" : "calibrate"}
+                </button>
+                {profile && (
+                  <button
+                    onClick={() => {
+                      clearProfile();
+                      setProfile(null);
+                    }}
+                    className="text-neutral-600 underline hover:text-neutral-400"
+                  >
+                    reset
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="flex items-center gap-3">
               <button

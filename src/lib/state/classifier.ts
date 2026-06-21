@@ -1,23 +1,39 @@
 import type { VisionMetrics, WorkState } from "@/lib/types";
+import type { CalibrationProfile } from "./calibration";
 
 // Thresholds tuned for a typical laptop webcam at desk distance. Gaze values
 // are normalized (~[-1,1]), not degrees, so they're independent of head size.
+// These are the fallback defaults; a CalibrationProfile overrides them per-user.
 export const THRESHOLDS = {
   gazeAwayNorm: 0.35, // |yaw| beyond this = looking left/right off-screen
   slouchNeckDeg: 45, // neck flexion beyond this = slouching
   drowsyEyeOpenness: 0.4, // sustained below this = eyes closing / fading
 };
 
-// Raw, per-tick verdict from a single metrics sample (no smoothing).
-// pitch is intentionally NOT thresholded yet — its level baseline is face-
-// dependent and needs field calibration; we surface it in the debug panel.
-export function rawState(m: VisionMetrics): WorkState {
+// Raw, per-tick verdict from a single metrics sample (no smoothing). When a
+// calibration profile is supplied, gaze/pitch/eye cutoffs are personalized —
+// notably pitch-down ("looking at phone"), which is only trustworthy once the
+// user's neutral baseline has actually been measured.
+export function rawState(
+  m: VisionMetrics,
+  profile?: CalibrationProfile | null,
+): WorkState {
   if (!m.facePresent) return "away";
   if (m.phonePresent) return "phone";
+
+  const eyeCut = profile?.eyeDrowsyThreshold ?? THRESHOLDS.drowsyEyeOpenness;
   // Eyes mostly closed = fading/drowsy.
-  if (m.eyeOpenness < THRESHOLDS.drowsyEyeOpenness) return "fading";
-  // Looking away: head turned left/right off the screen.
-  if (Math.abs(m.gazeYawNorm) > THRESHOLDS.gazeAwayNorm) return "distracted";
+  if (m.eyeOpenness < eyeCut) return "fading";
+
+  // Head tilted down off-screen (e.g. at a phone/notes) — calibrated only.
+  if (profile && m.gazePitchNorm > profile.pitchDownThreshold) return "distracted";
+
+  // Looking away: head turned left/right off the screen, relative to the user's
+  // own neutral center when calibrated.
+  const yawCenter = profile?.yawCenter ?? 0;
+  const yawTol = profile?.yawTolerance ?? THRESHOLDS.gazeAwayNorm;
+  if (Math.abs(m.gazeYawNorm - yawCenter) > yawTol) return "distracted";
+
   return "focused";
 }
 
@@ -43,8 +59,9 @@ export function initialClassifierState(
 export function step(
   state: ClassifierState,
   m: VisionMetrics,
+  profile?: CalibrationProfile | null,
 ): { state: ClassifierState; committed: WorkState } {
-  const raw = rawState(m);
+  const raw = rawState(m, profile);
 
   if (raw === state.current) {
     // Reinforces the status quo; clear any pending switch.
@@ -76,10 +93,13 @@ export function step(
 }
 
 // Convenience: run a whole sequence (used in tests / replay).
-export function classifySequence(samples: VisionMetrics[]): WorkState[] {
+export function classifySequence(
+  samples: VisionMetrics[],
+  profile?: CalibrationProfile | null,
+): WorkState[] {
   let s = initialClassifierState();
   return samples.map((m) => {
-    const r = step(s, m);
+    const r = step(s, m, profile);
     s = r.state;
     return r.committed;
   });

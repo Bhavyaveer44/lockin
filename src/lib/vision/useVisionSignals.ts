@@ -7,6 +7,7 @@ import {
   step,
   type ClassifierState,
 } from "@/lib/state/classifier";
+import type { CalibrationProfile } from "@/lib/state/calibration";
 import { VisionEngine } from "./engine";
 
 export type EngineStatus = "idle" | "loading" | "running" | "error";
@@ -32,6 +33,7 @@ export interface VisionSignals {
 export function useVisionSignals(
   videoRef: React.RefObject<HTMLVideoElement | null>,
   onState?: (state: WorkState, ts: number) => void,
+  profile?: CalibrationProfile | null,
 ): VisionSignals {
   const [status, setStatus] = useState<EngineStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,8 @@ export function useVisionSignals(
   const classRef = useRef<ClassifierState>(initialClassifierState());
   const onStateRef = useRef(onState);
   onStateRef.current = onState;
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
 
   const stop = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -92,7 +96,7 @@ export function useVisionSignals(
           try {
             const m = e.detect(v, performance.now());
             setMetrics(m);
-            const r = step(classRef.current, m);
+            const r = step(classRef.current, m, profileRef.current);
             classRef.current = r.state;
             setState((prev) => {
               if (prev !== r.committed) {

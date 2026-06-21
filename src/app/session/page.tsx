@@ -36,9 +36,11 @@ export default function SessionPage() {
     videoRef,
     (committed, ts) => {
       recorderRef.current?.mark(committed, ts);
-      // Alarm the moment focus breaks (fires on the committed transition).
+      // Keep ringing the whole time focus is broken; silence on return to focus.
       if (soundRef.current && ALARM_STATES.has(committed)) {
-        beeperRef.current?.alarm();
+        beeperRef.current?.start();
+      } else {
+        beeperRef.current?.stop();
       }
     },
   );
@@ -51,6 +53,9 @@ export default function SessionPage() {
 
   useEffect(() => {
     soundRef.current = soundOn;
+    // React immediately to the toggle without waiting for the next sample.
+    if (!soundOn) beeperRef.current?.stop();
+    else if (ALARM_STATES.has(stateRef.current)) beeperRef.current?.start();
   }, [soundOn]);
 
   // 1s ticker: accumulate deep-work time + periodic flush.

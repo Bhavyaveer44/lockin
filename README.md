@@ -1,5 +1,7 @@
 # Lockin — on-device deep-work camera companion
 
+https://lockin-sooty.vercel.app/
+
 Your webcam becomes a focus coach. Real-time computer vision runs **entirely in
 the browser** (MediaPipe Tasks Vision) — the camera feed never touches a server.
 Only derived state labels + timestamps are saved. At day's end, Groq turns that
